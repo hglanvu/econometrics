@@ -1,2 +1,2 @@
 # econometrics
-This is my R code from the assignments of my econometrics class 
+This is the R code from the assignments of my econometrics class 
