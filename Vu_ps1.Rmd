@@ -1,0 +1,122 @@
+---
+title: "POLSCI 630 - Problem Set 1"
+author: "Huong Vu"
+date: "1/10/2022"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Data cleaning
+
+Because I already install `tidyverse` package. I am not going to insert the code for installing tidyverse package here. I just call out the package from my library. I set working directory for the file by going to Set Working Directory in the Session tab. After that I loaded the data `parking.csv` which I already downloaded and saved in the same folder with the working directory.
+
+```{r, results="hide"}
+library(rmarkdown)
+library(tidyverse)
+parking_raw <- read_csv("parking.csv") #load the provided parking.csv file as parking_raw
+```
+
+I tried to understand the nature of the dataset and what it is about. Then I explored the data with some basic functions. I was informed that the data has 72 columns and 171 rows.
+
+```{r, results=FALSE}
+# Quick glimpses at the data
+names(parking_raw) # names of columns
+head(parking_raw) # first observations
+str(parking_raw) # data structure
+```
+
+```{r}
+dim(parking_raw) # number of cols and rows
+nrow(parking_raw) # number of rows
+ncol(parking_raw) # number of cols
+```
+
+Looking at the data, I knew that the variable `country` listed out all the countries, but it also includes some missing values. So to get the number of countries which are included in the dataset, I need to filter out NA values in the variable `country`. After filtering out NA values, we know the number of the countries in the dataset is 152.
+
+```{r}
+filter(parking_raw, !is.na(country)) # filter out 'NA' value in "country"
+```
+
+I created a new data frame named `parking`. The new data frame only included the variables `country`, `viol_pd`, `temp_post`, and `wbcode`. I filtered out the missing data in the variable `viol_pd`. I also sorted `viol_pd` in descending order. And then I renamed the variable `temp_post` to `viol_pd_post`.
+
+```{r, results=FALSE}
+parking <- parking_raw %>%
+  select(country, viol_pd, temp_post, wbcode) %>% # create the new dataframe 
+  filter(viol_pd != -99) %>% # filter out missing data in the variable "viol_pd"
+  rename(viol_pd_post = temp_post) %>% # rename the variable "temp_post" to "viol_pd_post"
+  arrange(desc(viol_pd)) # arrange the variable "viol_pd" in descending order
+```
+
+The structure of the new data frame has been shown by running `str(parking)` function. There are 149 countries which are included in the new data frame. The number of countries in the data frame `parking` is less than in the data frame `parking_raw` because we already filtered out the missing value in `viol_pd`. The original dataset does not include the data of parking violation of three countries, including Hong Kong, Puerto Rico and East Timor.
+
+```{r}
+str(parking) ## show data structure
+```
+
+# 2. Univariate analysis
+
+The  variable `viol_pd` includes the number of parking violations per diplomat from November 1997 to November 2002 for each country. By using `mean`, `var`, `sd` functions we got the mean, variance and standard deviation of `viol_pd`
+
+```{r}
+mean(parking$viol_pd) #find the mean of "viol_pd"
+var(parking$viol_pd) #find the variance of "viol_pd"
+sd(parking$viol_pd) # find the standard deviation of "viol_pd"
+
+```
+
+I created a histogram of `viol_pd` and also provided a title and label for the histogram.
+
+```{r, fig.height=7.1}
+hist(parking$viol_pd,
+     main = "Parking violations by diplomats to the United Nations
+in New York City",
+     xlab = "Number of violations",
+     ylab = "Number of countries")
+
+```
+
+I created a box plot of `viol_pd`. Looking at the box plot, we can estimate that the approximate median of `viol_pd` is 8 , 3rd quartile is 20, and maximum value is 250.
+
+```{r, fig.height=7.3}
+boxplot(parking$viol_pd,
+        main = "Parking violations by diplomats to the United Nations
+in New York City",
+        ylab = "Number of violations")
+
+```
+
+# 3. Bloomberg intervenes
+
+The variable `viol_pd_post` contains violations per diplomat from November 2002 to November 2005 after New York City started to remove the official diplomatic license plates from vehicles that had more than three unpaid parking violations. I were able to calculate the mean, variance and standard deviation of `viol_pd_post` by running built-in functions `mean`, `var` and `sd`. Compared with the variable `viol_pd`, the mean, variance and standard deviation of `viol_pd_post` are much lower, so we can say that the intervention was successful.
+
+```{r}
+mean(parking$viol_pd_post) #find the mean of "viol_pd_post"
+var(parking$viol_pd_post) #find the variance of "viol_pd_post"
+sd(parking$viol_pd_post) #find the standard deviation of "viol_pd_post"
+
+```
+
+# 4. Filters and mutations
+
+I created a new data frame named `top10`. The new data frame listed out 10 countries with the most violations. Also in this new data frame, I was able to calculate the difference between `viol_pd_post` and `viol_pd` in the new column `viol_diff` to understand the effectiveness of the intervention.
+
+```{r, results=FALSE}
+top10 <- parking %>% #create a new data frame named "top10"
+  arrange(desc(viol_pd)) %>% #arrange the variable "viol_pd" in descending order
+  slice(1:10) %>% #select the top 10 countries with the most parking violations
+  mutate(viol_diff = viol_pd - viol_pd_post) %>% #create a new variable "viol_diff" 
+  arrange(desc(viol_diff)) #arrange the variable "viol_diff" in descending order
+
+```
+
+The new data frame, `top10` is printed out by using `print` function.
+
+```{r}
+print(top10) #print the data frame "top10"
+```
