@@ -1,0 +1,354 @@
+---
+title: "POLSCI 630 - Problem Set 6"
+author: "Huong Vu"
+date: "2/12/2022"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r, echo=T, results="hide", message=F, warning=F}
+# New package: car (which contains the avPlot function)
+# install.packages("car")
+# install.packages("stargazer") # for comparing models in tables
+
+# Libraries
+library(tidyverse)
+library(jtools)
+library(stargazer)
+library(car) # "Companion to Applied Regression"
+
+```
+
+# 1. Matrices
+
+```{r}
+a <- matrix(c(1,1,1,1,4.00,2.75,3.15,3.50,18,16,17,22,100,40,55,80),4,4); a
+```
+```{r}
+b <- matrix(c(0.80,0.75,0.68,0.98),4,1); b
+```
+```{r}
+c<- matrix(c(3,0,0,0,3,0,0,0,3),3,3); c
+```
+
+```{r}
+d <- matrix(c(1,5,9,13,2,6,10,14,3,7,11,15,4,8,12,16),4,4); d
+```
+
+Type these four matrices into R:
+
+$$ a = \begin{bmatrix}
+1 & 4.00 & 18 & 100 \\
+1 & 2.75 & 16 & 40\\
+1 & 3.15 & 17 & 55 \\
+1 & 3.50 & 22 & 80\\
+\end{bmatrix}\\$$;
+
+$$ b = \begin{bmatrix} 
+0.80 \\
+0.75 \\
+0.68 \\
+0.98 \\
+\end{bmatrix}\\$$;
+
+$$ c = \begin{bmatrix} 
+3 & 0 & 0 \\
+0 & 3 & 0 \\
+0 & 0 & 3 \\
+\end{bmatrix}\\$$;
+
+$$ d = \begin{bmatrix} 
+1 & 2 & 3 & 4 \\
+5 & 6 & 7 & 8 \\
+9 & 10 & 11 & 12 \\
+13 & 14 & 15 & 16\\
+\end{bmatrix}\\$$
+
+
+
+## 1a. Add the two matrices that can be added together; print the resulting matrix
+Two matrices that can be added together are `a` and `d`.
+
+```{r}
+a; d; a + d
+
+```
+
+## 1b. Why can we not add the other matrices?
+The other matrices could not be added together because they have the different dimensions or they are not in the same order.
+
+## 1c. Without actually multiplying the matrices: which matrices above can we multiply together, and what are the dimensions of their products? List all possible combinations. Note: the order in matrix multiplication matters, so be explicit about the order in your answer, for example: E %*% F = 4 x 4 matrix or EF (4x4).
+* a %*% d = 4x4
+* d %*% a = 4x4
+* a %*% b = 4x1
+* d %*% b = 4x1
+
+## 1d. Multiply the matrices a and b to get matrix ab. Print the result
+```{r}
+a; b; a %*% b
+```
+
+## 1e. Take the transpose of b, then multiply it with `b` to get $b^Tb$. Print the result. Is the product a matrix, vector, or scalar?
+The product of b %*% t(b) is a matrix of 4x4.
+
+```{r}
+b; t(b); b %*% t(b)
+
+```
+
+## 1f. Take the transpose of d, then multiply it with `d` to get $d^Td$. Print the result. 
+Is the product a special kind of matrix? This matrix is a square matrix which has the same number of rows and columns (n x n)
+
+
+```{r}
+d; t(d); d %*% t(d)
+```
+
+## 1g. Using matrix commands, calculate and report (1) the coefficients and (2) the SSR of the predicted line resulting from regressing the driving test score on high school GPA, age, and the number of hours spent practicing.
+
+The regression model:
+$$score = \beta_0 + \beta_1 \cdot GPA +  \beta_2 \cdot age  + \beta_2 \cdot hours + u.$$
+We can derive the $\hat {\beta}$s using the following formula:
+
+$$ \hat{\beta} = (X^TX)^{-1}X^Ty $$
+Identify the independent variables (X) and the dependent variable (y) in this regression model:
+y = b
+X = a
+
+
+```{r}
+
+m <- solve(t(a) %*% a) # multiply Xt by X then take the inverse 
+betas <- m %*% t(a) %*% b # multiply that by Xt and y vector
+betas
+```
+
+$$\begin{bmatrix}
+\hat{\beta_0} \\
+\hat{\beta_1} \\
+\hat{\beta_2}  \\
+\hat{\beta_3} 
+\end{bmatrix}\\
+= 
+\begin{bmatrix}
+2.43851852 \\
+-1.07407407 \\
+0.02296296 \\
+0.02244444 \\
+\end{bmatrix}\\$$
+
+The sum of squared residuals is expressed in matrix notation as:
+$$SSR = (y - X\beta)^T(y - X\beta)$$
+```{r}
+# Calculate the error
+residuals <- b - a %*% betas 
+residuals
+
+# calculate degree of freedom
+k <- 3       # k = number of predictors
+df <- nrow(a) - k - 1  # df = number of obs - number of predictors - 1
+df
+
+# Residual variance 
+res_var <- sum(residuals^2) / df  # SSR/df
+res_var
+# Calculate covariance matrix of estimate 
+beta_cov <- res_var * m  # recall m = inverse(XtX)
+beta_cov 
+
+# Square root of the diagonal gives us the standard error
+beta_se <- sqrt(diag(beta_cov)) 
+beta_se
+```
+
+## 1h. 
+
+I added matrices `a` and `b` to a dataframe named `df`. I run the regression of the driving test score on high school GPA, age and hours spent on practicing. The beta coefficients are matched with the calculation in 1h.  
+
+```{r}
+
+# add the data in matrices a and b to a data frame
+df = data.frame(
+score = c(0.80, 0.75, 0.68, 0.98),
+GPA = c(4.00, 2.75, 3.15, 3.50),
+age = c(18, 16, 17,22),
+hours = c(100, 40, 55,80))
+
+# regressing the driving test score on high school GPA, age and hours spent on practicing
+reg_1 = lm(score ~ GPA + age + hours, df)
+summ(reg_1)
+```
+
+# 2. OVB and multiple regression
+## 2a.
+
+```{r}
+
+fastfood <- read.csv("fastfood.csv") # load the data
+
+# filter out NAs in pantree, prpblck, income and ldensity
+fastfood = fastfood %>% filter(!is.na(pentree) & !is.na(prpblck) & !is.na(income) & !is.na(ldensity)) 
+
+#summary(fastfood)
+
+```
+$$pentree = \beta_0 + \beta_1 \cdot prpblck + u$$
+Test $H_0$: $beta_1$ = 0 against $H_1$: $beta_1$ # 0
+
+```{r}
+reg_2 <- lm(pentree ~ prpblck, data = fastfood)
+summ(reg_2)
+```
+
+* Interpret the coefficient in terms of a ten percentage point increase in the share of community residents that are black.
+
+** 1 percentage point increase results in the increase of 0.57 USD in price
+** 10 percentage point increase results in the increase of 5.7 USD in price
+
+* T-statistic = 3.32. Critical value is equal to 1.645 for the 5% significance level. T-statistic falls into the rejection areal. The result is statistically significant at the 95% level. We can reject the null.
+
+
+## 2b. 
+
+A seminar participant suggests that your model suffers from omitted variable bias because it fails to account for community-level income levels; higher income levels increase the firms’ labor costs and rents. Assuming she is right, and without running any regressions, do you think your initial model over- or under-estimated discriminatory pricing, and was the coefficient in your initial model biased towards or against a null result? Why?
+
+```{r}
+# correlation between `prpblck` and `income`
+cor(fastfood$prpblck, fastfood$income)
+```
+* `prpblck` and `income` are negatively correlated. 
+* The higher income levels increase the firms’ labor costs and rent, and as a result it will increase the price (y) - `pentree`. It means that $beta_2$ which is `income` and `y` are positively correlated.
+* So the bias is negative and we understate the effect of $x_1$ which is `prpblck`  on `y`.
+* It means the coefficient in your initial model biased toward the null result.
+
+## 2c.
+By hand using the matrix methods learned in lab: derive the the coefficient and standard error for `prpblack` and `income` in a regression of `pentree` on `prpblack` and `income` (you are welcome to use the `lm()` command to check your results).
+
+The regression model:
+
+$$pentree = \beta_0 + \beta_1 \cdot prpblck +  \beta_2 \cdot income + u$$
+```{r}
+# First lets obtain the Beta hat vector
+# Create x and y 
+y <- fastfood %>%      
+  select(pentree) %>%
+  as.matrix()
+
+x <- fastfood %>%      
+  select(prpblck, income) %>%
+  mutate(intercept = 1) %>% 
+  as.matrix()
+
+m1 <- solve(t(x) %*% x) # multiply Xt by X then take the inverse 
+betas1 <- m1 %*% t(x) %*% y # multiply that by Xt and y vector 
+betas1
+
+# compare the betas to the regression results
+reg_3 = lm(pentree ~ prpblck + income, fastfood)
+reg_3; betas1
+
+```
+
+$$\begin{bmatrix}
+\hat{\beta_0} \\
+\hat{\beta_1} \\
+\hat{\beta_2}  \\
+\end{bmatrix}\\
+= 
+\begin{bmatrix}
+ 1.389699 \\
+ 0.4897496 \\
+-0.000002676603 \\
+\end{bmatrix}\\$$
+
+Interpret the coefficients:
+
+* 1 proportion increase of black residents in the community results in the increase of 0.4897496 USD in price
+* 1 USD increase in the income results in the decrease of 0.000002676603 USD in price
+* a $10, 000 increase in income results in the decrease of 0.02676603 USD in price
+
+Calculating standard error for `prpblack` and `income`:
+
+The formula:
+
+$$ SSR = (y - X\beta)^T(y - X\beta) $$
+```{r}
+# Now lets calculate the error
+residuals_1 <- y - x %*% betas1 # 
+#residuals_1
+
+# calculate degree of freedom
+k_1 <- ncol(x) - 2       # k = number of predictors
+#k_1
+
+df_1 <- nrow(x) - k_1 - 1  # df = number of obs - number of predictors - 1
+#df_1
+
+# Residual variance 
+res_var_1 <- sum(residuals_1^2) / df_1  # SSR/df
+#res_var_1
+
+# Calculate covariance matrix of estimate 
+beta_cov_1 <- res_var_1 * m1  # recall m1 = inverse(XtX)
+#beta_cov_1
+
+# Square root of the diagonal gives us the standard error
+#diag(beta_cov_1)
+beta_se_1 <- sqrt(diag(beta_cov_1)) 
+#beta_se_1
+
+# Compare SE to regression results
+beta_se_1; summ(lm(pentree ~ prpblck + income, fastfood))
+```
+
+
+Are your results consistent with your answer to (b) above - in other words, is the coefficient on prpblack smaller or larger than in the regression in (a) and what does this say about the direction of the bias when omitting income?
+
+* The results are consistent with the answer in part b. The coefficient on `prpblack` in the new regression model with `income` is smaller than the regression in part a. When omitting `income`, we understate the effect of `prpblack` on y.
+
+
+## 2d.
+Calculate the 95% confidence interval for the proportion black coefficient by hand (recall that k+1 = 3 in our model)
+```{r}
+# Confidence interval 
+c <- qt(0.05/2, df_1) # Constant is 1.96  for 95% conf == t score
+c
+
+confint(reg_3, level = 0.95)
+#CI lower= $beta_1$ - 1.96 x SE $beta_1$ = 0.49 - 1.96 x 0.19 =-0.2793
+#CI upper= $beta_1$ + 1.96 x SE $beta_1$ = 0.49 + 1.96 x 0.19 = 0.4655
+
+```
+
+* CI lower = 0.1120288
+* CI upper = 0.8674705
+* The effect is statistically significant. 
+
+## 2e.
+
+Estimate a new model regressing pentree on prpblack, income and ldensity.
+The model:
+$$pentree = \beta_0 + \beta_1 \cdot prpblck +  \beta_2 \cdot income + \beta_3 \cdot ldensity + u$$
+```{r}
+reg_4 <- lm(pentree ~ prpblck + income + ldensity, fastfood)
+summ(reg_4)
+```
+
+Interpret the coefficient on `ldensity`: 1% change in density results in a decrease of 0.02/100 = 0.0002 USD in price
+
+Compare the predicted price of an entree in a community that is 10% black with a mean level of income and mean logged density to the predicted price of an entree in a community that is 90% black with a mean level of income and mean logged density: The predicted price of an entree in a community which is 10% black (1.310824 USD) is lower than the predicted price of an entree in a community with 90% of black population (1.732081 USD)
+
+```{r}
+# a community with 10% of black population
+predicted_10 <- 1.57 + coef(reg_4)[2] * 0.1 +
+coef(reg_4)[3] * (mean(fastfood$income)) + coef(reg_4)[4]*(mean(fastfood$ldensity))
+predicted_10
+
+# a community with 90% of black population
+predicted_90 <- 1.57 + coef(reg_4)[2] * 0.9 +
+coef(reg_4)[3] * (mean(fastfood$income)) + coef(reg_4)[4]*(mean(fastfood$ldensity))
+predicted_90
+
+```
+

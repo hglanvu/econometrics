@@ -1,0 +1,173 @@
+---
+title: "POLSCI 630 - Problem Set 4"
+author: "Huong Vu"
+date: "1/31/2022"
+output: pdf_document
+---
+Before loading the data, I loaded the packages: `tidyverse`, `jtools`, `npreg` and `Metrics`. I also set the work directory for the file by going to the tab Session and then Set Working Directory. I loaded the `contrib.csv` dataset which I saved in the same folder with the working directory and named it `contrib`.
+
+```{r setup, results="hide", results="hide", message=F, warning=F}
+# load the packages
+library(tidyverse)
+library(jtools)
+library(npreg)
+library(Metrics)
+
+
+contrib <- read_csv("contrib.csv") # load the data
+summary(contrib) # quick glimpses at the data
+```
+
+# 1. Calculating Standard Errors
+The regession model of `given` on `age`:
+$$given_i = \beta_0 + \beta_1 \ age_i +  u_i$$
+I set Y is `given` which is the dependent variable and X is `age` which is the independent variable. 
+
+```{r, echo=T, results="hide", message=F, warning=F}
+# Dependent variable as y
+y <- contrib$given
+# Independent variable as x
+x <- contrib$age
+```
+
+I calculated $\beta_0$, $\beta_1$, standard error of $\beta_0$, and standard error of $\beta_1$.
+
+```{r}
+# Beta1
+beta1 <- sum((y - mean(y)) * (x - mean(x))) / sum(((x - mean(x))^2))
+beta1
+
+# Beta0
+beta0 <- mean(y) - beta1 * mean(x)
+beta0
+
+# Y hat
+y_hat <- beta1 * x + beta0
+
+# n
+n <- length(x)
+
+# MSE
+mse <- (1/(n - 2)) * sum((y - y_hat)^2)
+mse
+
+# Standard error of beta1
+# Variance of beta1
+beta1_var <- mse / sum((x - mean(x))^2)
+beta1_var
+
+# Standard error of beta1
+beta1_se <- sqrt(beta1_var)
+beta1_se
+
+# Standard error of beta0
+# Variance of beta0
+beta0_var <- mse * ((1/n) + (mean(x)^2/ sum((x - mean(x))^2)))
+beta0_var
+
+# Standard error of beta0
+beta0_se <- sqrt(beta0_var)
+beta0_se
+
+```
+
+I verified the coefficients and the standard errors that I derived by hand using the `lm()` command and reported the results with `summ()`.
+
+```{r pressure, echo=FALSE}
+# Compare results to those from the built-in function
+agegiven_reg <- lm(given ~ age, data = contrib)
+summ(agegiven_reg )
+```
+
+# 2. Interpretation and Analysis
+
+* Interpret the $\beta_0$  and $\beta_1$  coefficients: For one unit increase in `age`, it will increase 1.984817 in `given`. It means that if an observation increases 1 year in age, he/she tends to contribute more 1.984817 in `given`, which is equivalent to $1,984.817.
+
+* How much does the model predict that a 50 year old person will give? given_50 = 251.469, equivalent to $251,469
+```{r}
+given_50 = beta0 + beta1*50
+given_50
+```
+
+* How much more than a 40-year old will a 60-year old contribute, according to our model? The difference is `39.69634`, equivalent to `39,696.34`.
+
+```{r}
+given_40 = beta0 + beta1*40
+given_60 = beta0 + beta1*60
+given_difference = given_60 - given_40
+given_difference
+```
+
+
+* Create a scatter plot depicting the relationship between age and campaign contributions:
+
+```{r}
+plot(
+contrib$age, contrib$given,
+main = "The 2018 Cooperative Congressional Election Survey",
+xlab = "Age",
+ylab = "Campaign contributions")
+abline(agegiven_reg, col = "red") # Add regression object immediately below plot()
+```
+
+# 3. Factors Affecting Standard Errors
+
+I extracted a sample of 5,000 observations from the population 500 times and named the dataset of these 5,000 observations `sample_5000`. I performed a linear regression for `sample_5000`. The standard error of the age coefficient is 0.41.
+
+```{r}
+set.seed(630) # the set.seed command to ensure that others who run your code will get the same results
+
+for(i in 1:500) { # This code will "loop" 500 times
+# Sample 5,000 voters
+sample_5000 <- contrib %>%
+  sample_n(5000)
+# Run regression
+sample_5000_reg <- lm(given ~ age, data = sample_5000)
+}
+
+summ(sample_5000_reg)
+
+
+```
+
+
+I extracted a sample of 2,000 observations from the population 500 times and named the dataset of these 2,000 observations `sample_2000`. I performed a linear regression for `sample_2000`. The standard error of the age coefficient is 0.71
+
+```{r}
+
+set.seed(630) # the set.seed command to ensure that others who run your code will get the same results
+
+for(i in 1:500) { # This code will "loop" 500 times
+# Sample 2,000 voters
+sample_2000 <- contrib %>%
+  sample_n(2000)
+# Run regression
+sample_2000_reg <- lm(given ~ age, data = sample_2000)
+}
+summ(sample_2000_reg)
+
+```
+
+
+Between the two standard errors calculated above, the standard error of the age coefficient from `sample_5000` is smaller than the standard error of the age coefficient from `sample_2000` because the number of observations in `sample_5000` is bigger than in `sample_2000`.  
+
+
+For `sample_5000`, I filtered out people who are younger than 40 years old and older than 70 years old. The new restricted dataset was named `sample_5000_restricted`. After being filtered out `sample_5000_restricted` only contains 2,791 observations. I performed random draws of 2,000 observations for 500 times and created a linear regression for `sample_5000_restricted`. The standard error of the age coefficient is 1.35.
+
+```{r}
+sample_5000_restricted = filter(sample_5000, between(age, 40, 70))
+#View(sample_5000_restricted)
+
+set.seed(630) # the set.seed command to ensure that others who run your code will get the same results
+
+for(i in 1:500) {
+sam <- sample_5000_restricted %>%
+  sample_n(2000)
+sam_reg <- lm(given ~ age, data = sam)
+}
+
+
+summ(sam_reg)
+```
+
+Between `sample_5000` and `sample_5000_restricted`, the standard error of the age coefficient of `sample_5000` is smaller because the number of observations in `sample_5000_restricted `is smaller.

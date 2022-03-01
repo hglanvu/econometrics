@@ -1,0 +1,228 @@
+---
+title: "POLSCI 630 - Problem Set 2"
+author: "Huong Vu"
+date: "1/18/2022"
+output: pdf_document
+---
+
+# 0. Load Data
+
+Before loading the data, I loaded the `tidyverse` package and set the work directory for the file. I set the work directory by going to the tab Session and then Set Working Directory. I loaded the `aid_disasters.csv` dataset which I saved in the same folder with the working directory and named it `aid_raw`.
+
+```{r setup, include = F} 
+# set universal settings for all chunks
+knitr::opts_chunk$set(warning = F, message = F,      # don't print warnings or messages. 
+                      fig.width = 5, fig.height = 4) # format all figures as 5x4 inches.
+
+# load the packages we will use in this lab
+library(tidyverse) # basic package for data wrangling functions
+```
+
+```{r, results= "hide"}
+aid_raw <- read_csv("aid_disasters.csv") # load the data
+```
+
+# 1. Clean and Summarize Data
+
+I tried to get the sense of what the dataset looks like and pay attention to NA values. I noticed that the variable `gdppc` has 14 NA values. The data has 5 columns and 128 rows.
+
+```{r}
+summary(aid_raw) 
+```
+```{r, results= "hide"}
+# Quick glimpses at the data
+names(aid_raw) # names of columns
+head(aid_raw) # first observations
+str(aid_raw) # data structure
+dim(aid_raw) # number of cols and rows
+```
+
+I created a clean dataset named `aid` with the following functions. I created two new variables: `gdppc.log` by logging `gdppc` and `oda.log` by logging `tot_oda`. 
+
+```{r}
+aid <- aid_raw %>%
+  mutate(gdppc.log = log(gdppc), # create new variable: logged gdppc
+         oda.log = log(tot_oda)) # create new variable: logged tot_oda
+```
+
+And then I filtered out the observations which are below the 10th percentile or above the 90th percentile of logged gdp. First, I calculated the 10th percentile and the 90th percentile by using `quantile` function. The value of the 10th percentile is `6.438246` and the value of the 90th percentile is `9.012232`. Based on the results from `quantile` function, I filtered out the outliers by using `filter` function. The aid dataset after being cleaned and filtered contains 90 rows, 7 variables and no NAs. 
+
+```{r}
+quantile(aid$gdppc.log, c(.1,.9), na.rm = T) # calculate the 10th percentile and the 90th percentile
+aid = filter(aid, between(gdppc.log, 6.438246, 9.012232)) # filter out the outliers below the 10th percentile and above the 90th percentile
+
+summary(aid)
+```
+
+## 1a. How many countries are represented in the aid dataset? How many regions?
+
+The dataset has 90 countries and 5 different regions including Asia & Pacific, Europe & Central Asia, Latin America & Caribbean, Middle East & North Africa, Sub-Saharan Africa. 
+
+```{r}
+length(aid$country) # no. of countries in the dataset
+table(aid$region) # no. of regions in the dataset
+```
+## 1b. What is the mean value of `gdppc.log` in the dataset?
+
+The mean value of `ggdppc.log` is `7.878579`
+
+```{r}
+mean(aid$gdppc.log) # the mean value of gdppc.log
+```
+
+## 1c, 1d & 1e
+I created a new data frame named `aid.sum` containing the mean value of `oda.log` and `gdppc.log` for each region. I grouped the dataset by region using `group_by` function and used `summarize` function to calculate mean values of `oda.log` and `gdppc.log` for each region. I printed the data frame using print function. After filtering out the outliers in the dataset, there is no missing values for the variable `gdppc.log`. The mean value of `gdppc.log` for Sub-Saharan Africa is `7.42`.
+
+```{r}
+aid_sum = aid %>%
+  group_by(region) %>% # group the data by region
+  summarize(oda.log = mean(oda.log), # create a new variable equal to the average oda.log for each region
+            gdppc.log = mean(gdppc.log, na.rm = T)) # create a new variable equal to the average gdppc.log for each region
+
+print(aid_sum)
+
+```
+
+# 2. Univariate Analysis
+## 2a. Calculating mean, variance and standard deviation of oda.log without using the built-in functions
+
+```{r}
+summary(aid)
+# mean oda.log without built-in function
+mean = sum(aid$oda.log)/length(aid$oda.log)
+mean
+```
+
+```{r}
+# verify mean oda.log with built-in function
+mean(aid$oda.log) 
+```
+
+```{r}
+# variance oda.log without built-in function
+n = length(aid$gdppc.log)
+var = sum((aid$oda.log - mean)^2)/(n-1)
+var
+```
+
+```{r}
+# verify variance oda.log with built-in function
+var(aid$oda.log)
+```
+
+```{r}
+# standard deviation of oda.log without built-in function
+sd = sqrt(var)
+sd
+```
+
+```{r}
+# verify standard deviation of oda.log with built-in function
+sd(aid$oda.log)
+```
+
+## 2b. Creating a histogram of oda.log
+
+```{r}
+hist(aid$oda.log,
+     xlab = "Logged ODA",
+     ylab = "Country",
+     main = "Histogram of Logged ODA")
+abline(v = quantile(aid$oda.log, .20), # add a vertical line at the 20th quantile
+       col = "blue")
+abline(v = quantile(aid$oda.log, .80), # add a vertical line at the 80th quantile
+       col = "red")
+legend("topleft",                  # where to put the legend
+       lty = c(1, 1),              # specify line type: 1=solid line
+       legend = c("20th", "80th"), # what do the lines stand for
+       col = c("blue", "red"))  
+```
+
+# 3. Multivariate Analysis
+## 3a. Computing the covariance and correlation between `oda.log` and `gdppc.log` without using the built-in functions
+
+```{r}
+# Set x = oda.log, y = gdppc.log
+x = aid$oda.log
+y = aid$gdppc.log
+
+# covariance
+# covariance without built-in function
+n = nrow(aid)
+x_bar = mean(aid$oda.log)
+y_bar = mean(aid$gdppc.log)                          
+
+sum((x - x_bar)*(y - y_bar))/(n - 1)                        
+
+# verify covariance with built-in function
+cov(x, y) 
+
+# correlation without built-in function
+cov(x, y)/(sd(x)*sd(y))
+
+# verify correlation with built-in function
+cor(x,y)
+```
+## 3b. Are aid and GDP per capita strongly correlated? What is the nature of the relationship between oda.log and gdppc.log?
+
+Correlation ranges from -1 to 1 and describes the direction and degree of relationship between two variables. The aid and GPD per capita are negatively correlated because the correlation is `-0.248727`. It means that as one variable gets larger, the other variable gets smaller. As GDP per capita gets bigger, the aid gets smaller.
+
+
+# 4. Hypothesis Testing
+## 4a. Performing t-test without using built-in function
+
+* Ho = There is no difference in amount of ODA (logged) received by countries that recently experienced a natural disaster and countries that did not.
+* Ha = There is a difference in amount of ODA (logged) received by countries that recently experienced a natural disaster and countries that did not.
+* The t-statistic is `-2.2538`. As we already knew the df, the two-tailed test and the confident interval, we could use t-table to find the critical value. The critical value in this case is 1.98. We also can use R function to verify the critical value. Because the t-statistic falls into the rejection area, we can reject the null. Moreover,  p-value is `0.0272` which is smaller than 0.05. The small p-value also indicates that we can reject the null.
+
+```{r}
+sum_aid = aid %>%
+  group_by(disaster) %>% # group the treatment and control in disaster
+  summarize(mean = mean(oda.log),
+            var = var(oda.log),
+            sd = sd(oda.log),
+            n = length(oda.log))
+
+# save treatment stats
+t = sum_aid %>% filter(disaster == 1)
+t
+
+# save control stats
+c = sum_aid %>% filter(disaster == 0)
+c    
+
+# Numbers of observations
+n_c <- c$n # no. of observations in control group
+n_t <- t$n # no. of observations in treatment group
+
+# Standard deviations
+sd_c <- c$sd # sd for control group
+sd_t <- t$sd # sd for treatment group
+
+# Means
+mean_c <- c$mean # mean for control group
+mean_t <- t$mean # mean for treatment group
+
+# Compute denominator
+sigma_tc <- sqrt(sd_c^2/n_c + sd_t^2/n_t)
+
+# Compute T-statistic
+t_stat <- (mean_t - mean_c) / sigma_tc
+t_stat
+
+qt(p = 0.05/2, df = 87.657, lower.tail = FALSE) # verify the critical value (= 1.987398)
+
+# Verify against built-in command
+t.test(oda.log ~ disaster, data = aid)
+```
+
+## 4b. Performing t-test the null hypothesis that 50% of countries experienced a natural disaster in 2017 
+
+In this section, we want to test the null hypothesis that 50% of countries experienced a natural disaster in 2017. So Ho: `mean disaster = .5`
+The t-statistic is `-4.9778`. As we already knew the df, the two-tailed test and the confident interval, we could use t-table to find the critical value. In this case, the critical value is 1.98. We also can use R function to find critical value. Because the t-statistic falls into the rejection area, we can reject the null. Moreover, p-value is `3.122e-06` (equivalent to `0.000003122`) which is smaller than 0.05, the small p-value also indicates that we can reject the null.
+
+```{r}
+t.test(aid$disaster, mu = 0.5)
+qt(p = 0.05/2, df = 113, lower.tail = FALSE) # verify the critical value (= 1.98118)
+``` 
+

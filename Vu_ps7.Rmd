@@ -1,0 +1,180 @@
+---
+title: "POLSCI 630 - Problem Set 7"
+author: "Huong Vu"
+date: "2/18/2022"
+output: pdf_document
+---
+
+```{r, echo=T, results="hide", message=F, warning=F}
+# Libraries
+
+library(tidyverse)
+library(jtools)
+library(margins)
+
+```
+# 1. Dummy Variables and Interaction Effects
+
+```{r}
+contribupdate <- read_csv("contribupdate.csv") # load data
+# summary(contribupdate) # check NAs
+```
+## 1.1 
+
+Regress given on `female` and `minority` and interpret the coefficients of the intercept, female, and minority.
+
+The regression model:
+$$  given = \beta_{0} + \beta_{1}female + \beta_{2}minority + e$$
+
+* Interpret the coefficient of the intercept: The average amount that a Caucasian man contributes is 312.32 USD.
+
+* Interpret the coefficient of female: Holding `minority` fixed, women contribute 108.97 USD less than men.
+
+* Interpret the coefficient of minority: Holding `female` fixed, minority group or non-Caucasians contribute 3.47 USD less than Caucasians.
+
+```{r}
+m1 <- lm(given ~ female + minority, contribupdate)
+summ(m1)
+```
+
+## 1.2 
+
+(Dummy-Dummy Interaction): You suspect that the effect of `female` on `given` may be conditioned by whether or not an individual is a minority. Regress `given` on `female`, `minority` and their interaction term. Report the regression table using summ(). Report the predicted campaign contributions by a male non-minority, a male minority, a female non-minority, and a female minority.
+
+The regression model:
+
+$$\hat{given_i} = \hat{\beta}_0  + \hat{\beta}_1 female_i +  \hat{\beta}_2 minority_i + \hat{\beta}_3 female_i \times minority_i + u $$
+
+* The predicted campaign contribution by a male non-minority: female = 0, minority = 0 -> $beta_1$ = 0, $beta_2$ = 0, $beta_3$ = 0. The predicted campaign contribution by a male non-minority = $beta_0$ = 312.64 USD.
+
+* The predicted campaign contribution by a male minority: female = 0, minority = 1 -> $beta_1$ = 0, $beta_3$ = 0.  The predicted campaign contribution by a male minority = $beta_2$ + $beta_0$ = 312.64 - 5.54 = 307.1 USD
+
+* The predicted campaign contribution by a female non-minority: female = 1, minority = 0 -> $beta_2$ = 0, $beta_3$ = 0. The predicted campaign contribution by a female non-minority = $beta_0$ + $beta_1$ = 312.64 - 109.71 = 202.93 USD
+
+* The predicted campaign contribution by a female minority: female = 1, minority = 1 -> The predicted campaign contribution by a female minority = $beta_0$ + $beta_1$ + $beta_2$ + $beta_3$ = 312.64 - 109.71 - 5.54 + 4.14 = 201.53 USD
+
+```{r}
+m2 <- lm(given ~  female + minority + female:minority, contribupdate) 
+summ(m2)
+```
+
+## 1.3
+
+(Dummy-Continuous Interaction): Regress `given` on `female`, `age`, and their interaction. Report the regression table using summ(). What is the marginal effect of `age` on campaign contributions for female? What is the marginal effect of `age` on campaign contributions for male?
+
+The regression model:
+
+$$\hat{given_i} = \hat{\beta}_0  + \hat{\beta}_1 female_i +  \hat{\beta}_2 age_i + \hat{\beta}_3 female_i \times age_i + u $$
+The marginal effect of `age` on campaign contributions for female:
+
+$$
+\frac{\partial \hat{given}}{\partial age} = \hat{\beta_2} + \hat{\beta_3}
+$$
+The marginal effect of `age` on campaign contributions for male:
+
+$$
+\frac{\partial \hat{given}}{\partial age} = \hat{\beta_2}   
+$$
+```{r}
+m3 <- lm(given ~  female + age + female:age, contribupdate) 
+summ(m3)
+```
+
+## 1.4
+
+(Categorical-Continuous Interaction): Regress given on educ, age, and their interactions (You can use any level of educational attainment as the reference group). Report the regression table using summ(). What are the marginal effects of age on campaign contributions for each educational attainment group (high school diploma, college degree, graduate degree)?
+
+The regression model:
+
+$$
+\begin{aligned}
+given_i = \beta_0 + \beta_1 educ\_graduate_i + \beta_2 educ\_highschool_i + 
+\beta_3 age_i + \\beta_4 educ\_graduate_i \times age_i + \beta_5 educ\_highschool_i \times age_i + u
+\end{aligned}
+$$
+```{r}
+m4 <- lm(given ~  educ + age + educ:age, contribupdate) 
+summ(m4)
+```
+
+The marginal effects of age on campaign contributions for high school diploma:
+$$
+\frac{\partial \hat{given}}{\partial age} = \hat{\beta_2} + \hat{\beta_5} 
+$$
+The marginal effects of age on campaign contributions for college degree:
+
+$$
+\frac{\partial \hat{given}}{\partial age} = \hat{\beta_3} 
+$$
+The marginal effects of age on campaign contributions for graduate degree:
+
+$$
+\frac{\partial \hat{given}}{\partial age} = \hat{\beta_1} + \hat{\beta_4} 
+$$
+
+
+## 1.5
+Plot the regression lines for the three educational attainment groups on the same plot with age as the x-axis and given as the y-axis.
+```{r}
+m4educcollege <- coefficients(m4)["(Intercept)"]
+
+m4educgraduate <- coefficients(m4)["(Intercept)"] + 
+  coefficients(m4)["educgraduate"]
+
+m4educhighschool <- coefficients(m4)["(Intercept)"] + 
+  coefficients(m4)["educhighschool"]
+
+m4educcollege_slope <- coefficients(m4)["age"]
+
+m4educgraduate_slope <- coefficients(m4)["age"] + 
+  coefficients(m4)["educgraduate:age"] 
+
+m4educhighschool_slope <- coefficients(m4)["age"] + 
+  coefficients(m4)["educhighschool:age"] 
+
+lines.df <- data.frame(intercepts = c(m4educcollege, m4educgraduate, m4educhighschool) ,
+                       slopes = c(m4educcollege_slope, m4educgraduate_slope, m4educhighschool_slope),
+                       educ = c("college", "graduate", "highschool"))
+
+#
+
+contrib <- ggplot(contribupdate, aes(x = age, y = given))
+
+contrib_labels <- labs(
+  title = "Age and Contribution",
+  x = "Age",
+  y = "Contribution"
+)
+
+contrib + 
+  contrib_labels +
+  geom_point(aes(color = educ)) + 
+  geom_abline(aes(intercept = intercepts, 
+                  slope = slopes, 
+                  color = educ), data = lines.df)
+
+```
+
+# 2. Difference-in-Differences
+```{r}
+crime <- read_csv("crime.csv") # load data
+# summary(crime) # check NAs
+```
+
+Regress `totrob` on `treatment`,`time`, and their interaction. Report the regression table with summ(). Interpret the coefficient on the interaction term. Is this coefficient statistically significant at a 95% level?
+
+The regression model:
+
+$$\hat{totrob_i} = \hat{\beta}_0  + \hat{\beta}_1 treatment_i +  \hat{\beta}_2 time_i + \hat{\beta}_3 treatment_i \times time_i + u $$
+
+```{r}
+m5 <- lm(totrob ~  treatment + time + treatment:time, crime) 
+summ(m5)
+```
+
+* Interpret the coefficient on the interaction term: For the blocks which have Jewish institutions in the post-treatment period, the presence of police unit reduces the incidence of car thefts per week by 0.08 as compared with the blocks which have no Jewish institution and do not receive the police unit .
+
+* Is this coefficient statistically significant at a 95% level? The coefficient on the interaction term is significant at 95% level because the p-value is very small (0.00).
+
+
+

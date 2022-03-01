@@ -1,0 +1,172 @@
+---
+title: "POLSCI 630 - Problem Set 3"
+author: "Huong Vu"
+date: "1/22/2022"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+Before loading the data, I loaded the `tidyverse` and `jtools`package. I also set the work directory for the file by going to the tab Session and then Set Working Directory. I loaded the `ceosalary.csv` dataset which I saved in the same folder with the working directory and named it `ceosalary`.
+
+```{r, echo=T, results="hide", message=F, warning=F}
+# set universal settings for all chunks
+knitr::opts_chunk$set(warning = F, message = F,      # don't print warnings or messages. 
+                      fig.width = 5, fig.height = 4) # format all figures as 5x4 inches.
+
+# load the packages
+library(tidyverse) # basic package for data wrangling functions
+library(jtools)
+ceosalary <- read_csv("ceosalary.csv") # load the data
+```
+
+# 1. Bivariate Linear Regression
+
+I set Y is `salary` which is the dependent variable and X is `profits` which is the independent variable. I calculated the values of $\beta_0$, $\beta_1$, TSS, ESS, SSR, $R^{2}$ and got the results as follows:
+
+* The slop of the equation is equal to $\beta_1$ = 0.5722961
+* The intercept of the equation is equal to $\beta_0$ = 746.92381
+
+* A CEO who made \$0 in firm profits is predicted to make $\beta_0$ = 746.92381 (intercept), equivalent to \$746,923.81 in salary in 1990.
+* A CEO who made \$10-million in firm profits is predicted to make predicted $\hat{y}$ = 752.6468, equivalent to \$752,646.8 in salary in 1990 (this calculation is conducted in Part 2 of this Problem Set).
+* A \$1-million increase in firm profits is associated with an increase of $\beta_1$ = 0.5722961, equivalent to \$572.2961 in the salary of the CEO.
+
+```{r}
+
+# y as dependent variable
+y <- ceosalary$salary
+# x as independent variable
+x <- ceosalary$profits
+
+beta1 <- sum((x - mean(x)) * (y - mean(y))) / sum(((x - mean(x))^2)) # calculate beta 1
+beta1
+
+beta0 <- mean(y) - beta1 * mean(x) # calculate beta 0
+beta0
+
+# predicted y hat
+y_hat <- beta0 + beta1 * x 
+y_hat
+
+# Compare predicted to actual values 
+ceosalary$salary_hat <- y_hat
+ceosalary$u2 <- (y - y_hat)^2
+#View(ceosalary)
+
+# Run regression with built-in function
+ceosalary_reg <- lm(salary ~ profits, data = ceosalary)
+summary(ceosalary_reg)
+
+# a function from the jtools package that allows us to view the results from regression
+summ(ceosalary_reg)
+
+# total sum of squares
+tss <- sum((y - mean(y))^2)
+tss
+
+# explained sum of squares
+ess <- sum((y_hat - mean(y))^2)
+ess
+
+# sum squares of errors
+ssr <- sum(((y - y_hat)^2 ))
+ssr
+
+# r squared
+r_2 = ess/tss
+r_2
+
+```
+
+# 2. Creating a Scatter Plot
+
+The scatter plot depicting the relationship between salary and profits: the x-axis demonstrates the values of the variable `profits` and the y-axis demonstrates the values of the `salary` variable. The regression line is in blue.
+
+```{r}
+# plot 1
+plot(
+  ceosalary$profits, ceosalary$salary,
+  main = "CEO Salary",
+  xlab = "Profits",
+  ylab = "Salary")
+abline(ceosalary_reg, col = "blue") # Add regression object immediately below plot()
+```
+
+The scatter plot predicting salary when profit is $10 million: the x-axis demonstrates the values of the variable `profits` and the y-axis demonstrates the values of the `salary` variable. The regression line is in blue. The point is located by the red vertical and horizontal `abline`.
+
+```{r}
+# plot 2
+x_val1 <- 10
+x_val1
+
+# predicted y value
+beta1 * x_val1 + beta0
+
+beta0
+
+
+plot(
+  ceosalary$profits, ceosalary$salary, 
+  main = "CEO Salary", 
+  xlab = "Profits", 
+  ylab = "Salary"
+  )
+abline(ceosalary_reg, col = "blue")
+abline(v = x_val1, col = "red")
+abline(h = (beta1 * x_val1 + beta0), col = "red")
+```
+
+# 3. Using for Loop
+
+I created a new column in the dataset named `salaryeuro` that reports the salary in €1000 (Euro) with the conversion rate $1 = €0.88.
+
+```{r}
+# use `for` loop to create new variable `salaryeuro`
+#mutate(ceosalary, salaryeuro = salary * 0.88)
+ceosalary$salaryeuro <- 0
+for (i in 1:length(ceosalary$salaryeuro)) { ceosalary$salaryeuro[i] <- ceosalary$salary[i] * 0.88 } 
+#View(ceosalary)
+```
+
+I used a for loop to count the number of CEOs who are older than 60 years old. There are a total of 53 CEOs who are older than 60.
+
+```{r}
+
+count <- 0
+for (i in ceosalary$age) {
+  if (i > 60) {
+    count = count + 1}
+  }
+
+print(count)
+```
+
+I created a new variable named `profitsbinary`. The `profitsbinary` variable will take a value of 1 if a CEO’s firm made a positive profit (`profits` > 0) and a value of 0 if the CEO’s firm suffered a loss (`profits` < 0).
+
+```{r}
+# create a new variable `profitsbinary`
+ceosalary$profitsbinary <- 0 
+
+# create for loop to assign the values for `profitsbinary`
+for (i in 1:length(ceosalary$profits)) {
+  if (ceosalary$profits[i] > 0 ) {
+    ceosalary$profitsbinary[i] <- 1
+  }else {
+      ceosalary$profitsbinary[i] <- 0
+  }
+}
+
+#View(ceosalary)
+#It run successfully
+
+```
+
+
+
+
+
+
+
+
+
