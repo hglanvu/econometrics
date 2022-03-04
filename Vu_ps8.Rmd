@@ -1,0 +1,320 @@
+---
+title: "POLSCI 630 - Problem Set 7"
+author: "Huong Vu"
+date: "3/2/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=5.5, fig.height=3, stargazer.header = FALSE, warning = F) 
+library(tidyverse)
+library(stargazer)
+library(readr)
+library(margins)
+library(jtools)
+
+```
+
+# 1. Operationalization and Visualization
+
+The problem set require us to investigate the relationship between property rights, regime type, and development by testing two hypotheses derived from the literature:
+
+*H1: Countries with stronger property rights experience greater levels of development than countries with weaker property rights.*
+
+*H2: The effect of property right protection on development is conditional on regime type - property rights will have a stronger effect on development in autocracies than in democracies.*
+
+In this assignment, I decide to represent the concepts we are studying with the following variables in the core models:
+
++ **Property Rights**: `prop_vdem`. This variable provides property rights score, so it's important in investing
++ **Regime**: `dem_polity`. This variable is a score of democracy. Based on this score we are able to figure out which countries are autocracies and democracies
++ **Development**: `gdp_pc`. GDP per capita reflect development of countries.
+
+
+```{r, include=FALSE}
+dat = read_csv("week8problemset.csv")
+names(dat)
+
+```
+
++ Check to see whether the dataset has NAs: there are NAs in  `dem_polity`, `gdp_pc` and other variables. 
++ Decide whether some variables might need to be transformed: to decide if I need to transform the variables, I will create the histograms of each variable to see how the observations are distributed.
+
+```{r}
+#summary(dat)
+```
+```{r}
+
+#na.omit(dat, cols=c("dem_polity", "gdp_pc"))
+#na.omit(dat)
+
+#dat.na.omit = dat %>%
+  #select(dem_polity, gdp_pc)
+
+#dat.na.omit = na.omit(dat.na.omit)
+
+data_omit <- na.omit(dat)                           
+data_omit  
+#summary(data_omit)
+```
+```{r}
+hist(data_omit$gdp_pc, main = "GDP per capita")
+hist(data_omit$prop_vdem, main = "Property Rights")
+
+```
+I tried to log gdp_pc and prop_vdem. However, after being logged, prop_vdem prop_vdem is still skewed, so I decided to keep it originally.\\
+I turned dem_polity into a dummy variable. The countries which has dem_polity score above zero have been coded 1 and other countries have been coded 0.
+
+```{r}
+data_omit = data_omit %>% 
+  mutate(gdp_pc.ln = log(gdp_pc), # log `gdp_pc`
+         dem.dummy = as.factor(ifelse(dem_polity > 0, 1, 0))) # turn `dem_polity` into a dummy variable
+
+View(data_omit)
+
+hist(data_omit$gdp_pc.ln, main = "GDP per capita")
+
+```
+
+## 1b. In one single figure, plot the three way relationship between development, property rights, and democracy.
+
+We can see from the plot that most of democratic countries (which are coded in green) have very high GPD per capita.
+
+```{r}
+dem.dummy.color=c("red", "green")
+ggplot(data_omit, aes(x = prop_vdem, y = gdp_pc.ln))+
+  geom_point(aes(color = dem.dummy))+
+  xlab("Property Rights") +
+  ylab("GDP per Capita (log)") +
+  ggtitle("Property Rights vs. Development") + scale_color_manual("Democracy Dummy", values = dem.dummy.color)
+```
+# 2. Test H1 and H2 without controls
+
+*H1: Countries with stronger property rights experience greater levels of development than countries with weaker property rights.*
+
+*H2: The effect of property right protection on development is conditional on regime type - property rights will have a stronger effect on development in autocracies than in democracies.*
+
+## 2.a. Test H1 with a simple univariate regression, regressing your measure of development on property rights. Interpret the coefficient on property rights in two ways: first in terms of a 1 unit change in property rights, and then in a second way of your choosing that helps to illustrate the substantive size of the effect. Can you reject the null hypothesis for H1?
+
+The regression model:
+$$  ln(gdp\_pc) = \beta_{0} + \beta_{1} prop\_vdem + e$$
+Interpretation: 
+A unit change in property rights results in a 453 percent change in GDP
+
+We can reject the null hypotheis for H1. The coefficient is significant at 95% level because the p-value is very small (0.00).
+
+```{r}
+lm1 <- lm(gdp_pc.ln ~ prop_vdem, data_omit)
+summ(lm1)
+```
+
+
+
+## 2.b. Test H2 by regressing your measure of development on the interaction between property rights and the dichotomous democracy variable. Do the results support H2? Plot the predicted value of development as property rights varies for democracies and autocracies, including all necessary labels and legends. Include 1-2 sentences to help your reader understand the plot.
+
+The regression model:
+$$  log(gdp\_pc) = \beta_{0} + \beta_{1}.prop\_vdem + \beta_{2}.dem\_polity + \beta_{3}.prop\_vdem \times dem\_polity  + e$$
+
+*H2: The effect of property right protection on development is conditional on regime type - property rights will have a stronger effect on development in autocracies than in democracies.*
+
+* The results from regression model support H2. The coefficient  of interaction is significant because p-value is very small (0.00)
+* For democracies (dem_polity = 1), ln(gdp) = 7.23 + 1.13.prop_vdem 
+* For autocracies (dem_polity = 0), ln(gdp) = 7.23 + 1.13.prop_vdem - 0.36 +  0.60.prop_vdem = 6.87 + 1.73.rop_vdem
+* For autocracies, one unit increase in property right protection will increase 60 percent in GDP per capita more than democracies.
+
+```{r}
+lm2 <- lm(gdp_pc.ln ~ prop_vdem + dem_polity + prop_vdem:dem_polity, data_omit)
+summ(lm2)
+```
+
+
+```{r, results = "asis"}
+stargazer(lm1, lm2, 
+          title = "Table 1: Core models", # add title
+          dep.var.labels = "GDP Per Capita (logged)",
+          covariate.labels = c("Property Rights", "Democracy",  
+                               "Property Rights:Democracy"),
+          digits = 4, # print 4 digits after decimal
+          omit.stat = c("f", "ser"), # omit F stat and residual standard error
+          add.lines = list(c("F Stat", "46.491^{***}", "54.253^{***}"), # add F Stat by hand
+                           c("Res. Std. Error", "1.257", "0.611"), # add RSE by hand
+                           c("Degree Freedom", "168", "75")), # add DF by hand
+          font.size = "small",
+          type = "text") # change to type = "latex" for knitting!
+```
+
+Plot the predicted value of development as property rights varies for democracies and autocracies, including all necessary labels and legends.
+
+```{r}
+# Our base chart:
+eval_base <- ggplot(data_omit, aes(x = prop_vdem, y = gdp_pc.ln))
+
+# Our base labels:
+eval_labels <- labs(
+  title = "Development and Property Rights",
+  x = "VDEM's Property Rights Score",
+  y = "GDP per capita"
+)
+
+# Our basic chart:
+eval_base +
+  eval_labels + 
+  geom_point() +
+  geom_smooth(method = "lm")
+
+
+lm2_autocracies <- coefficients(lm2)["(Intercept)"]
+
+lm2_democracies <- coefficients(lm2)["(Intercept)"] + 
+  coefficients(lm2)["dem_polity"]
+
+lm2_autocracies_slope <- coefficients(lm2)["prop_vdem"]
+
+lm2_democracies_slope <- coefficients(lm2)["prop_vdem"] + 
+  coefficients(lm2)["prop_vdem:dem_polity"]
+
+lines.df <- data.frame(intercepts = c(lm2_autocracies, lm2_democracies) ,
+                       slopes = c(lm2_autocracies_slope,lm2_democracies_slope),
+                       regime = c("autocracies", "democracies"))
+
+eval_base + 
+  eval_labels +
+  geom_point(aes(color = dem.dummy)) + 
+  geom_abline(aes(intercept = intercepts, 
+                  slope = slopes, 
+                  color = regime), data = lines.df)
+```
+
+# 3. 
+
+## 3a. 
+
+State which two additional controls you will include in the models. From a theoretical perspective, why do you believe these controls are necessary for the analysis?
+
+2 additional controls that I chose for the models are `educ` - education and `elec_access` - electricity access. Both education and electricity access are very important for development. They are important factors for GDP growth.
+
+
+The original regression model:
+$$  log(gdp\_pc) = \beta_{0} + \beta_{1} prop\_vdem + e$$
+
+```{r}
+lm1 <- lm(gdp_pc.ln ~ prop_vdem, data_omit)
+summ(lm1)
+```
+
+Adding `educ` variable:
+
+$$  log(gdp\_pc) = \beta_{0} + \beta_{1}\times prop\_vdem + \beta_{2}\times educ + e$$
+
+
+
+```{r}
+lm3 <- lm(gdp_pc.ln ~ prop_vdem + educ, data_omit)
+summ(lm3)
+```
+
+Adding `elec_access` variable:
+$$  log(gdp\_pc) = \beta_{0} + \beta_{1}\times prop\_vdem + \beta_{2}\times elec\_access + e$$
+```{r}
+lm4 <- lm(gdp_pc.ln ~ prop_vdem + elec_access, data_omit)
+summ(lm4)
+```
+
+
+```{r, results = "asis"}
+stargazer(lm1, lm3, lm4,
+          title = "Table 2: The core model with each control variable", # add title
+          dep.var.labels = "GDP Per Capita (logged)",
+          covariate.labels = c("Property Rights", "Education", 
+                               "Electricily Access"),
+          digits = 4, # print 4 digits after decimal
+          omit.stat = c("f", "ser"), # omit F stat and residual standard error
+          add.lines = list(c("F Stat", "46.491^{***}", "54.253^{***}"), # add F Stat by hand
+                           c("Res. Std. Error", "1.257", "0.611"), # add RSE by hand
+                           c("Degree Freedom", "168", "75")), # add DF by hand
+          font.size = "small",
+          type = "text") # change to type = "latex" for knitting!
+```
+
+From a statistical perspective, how might omission of each of these two covariates bias the coefficient on property rights in the univariate model you estimated in 2a above? As we can see in the table above, the coefficients of property rights are lower when we add education and electricity access. It means that education and electricity access also contribute to development/ GDP growth. And if we omit education and electricty access, we overestimate the coefficient of proterty rights on development.
+
+## 3b.
+
+* Adding control variables to 2a
+
+$$  log(gdp\_pc) = \beta_{0} + \beta_{1}. prop\_vdem + \beta_{2}.educ + \beta_{3}.elec\_access  + e$$
+
+```{r}
+lm5 <- lm(gdp_pc.ln ~ prop_vdem + educ + elec_access , data_omit)
+summ(lm5)
+
+```
+
+* Adding control variables to 2b
+
+$$  log(gdp\_pc) = \beta_{0} + \beta_{1}.prop\_vdem + \beta_{2}.dem\_polity + \beta_{3}.prop\_vdem \times dem\_polity + \beta_{4}.educ + \beta_{5}.elec\_access + e$$
+
+```{r}
+
+lm6 <- lm(gdp_pc.ln ~ prop_vdem + dem_polity + prop_vdem:dem_polity + educ + elec_access, data_omit)
+summ(lm6)
+```
+
+
+
+```{r, results = "asis"}
+stargazer(lm3, lm4, lm5, lm6,
+          title = "Table 3: Models with control variables", # add title
+          dep.var.labels = "GDP Per Capita (logged)",
+          covariate.labels = c("Property Rights", "Democracy", "Education", 
+                               "Electricily Access", "Property Rights:Democracy"),
+          digits = 4, # print 4 digits after decimal
+          omit.stat = c("f", "ser"), # omit F stat and residual standard error
+          add.lines = list(c("F Stat", "46.491^{***}", "54.253^{***}"), # add F Stat by hand
+                           c("Res. Std. Error", "1.257", "0.611"), # add RSE by hand
+                           c("Degree Freedom", "168", "75")), # add DF by hand
+          font.size = "small",
+          type = "text") # change to type = "latex" for knitting!
+```
+
+* Property rights score has a significant impact on development/ GDP per capita in the model 1, model 2 and model 3. Property rights coefficient is not significant in model 4. the more we add more variables, the less coefficient of property rights will become. It means that other factors in the models also contribute to GDP growth.
+
+* Education has a significant impact on development/ GDP per capita in model 1, 3 and 4. For 1 year increased in average years of schooling for ages 15+, GDP per captia increases 29.93, 25.09, 21.23 percent in model 1, 3 and 4 respectively.
+
+* The coefficient of electricity access is only significant in the second model. 1 more percentage of the population with electricity access will increase 3.17 percent of GDP per capita 
+
+
+Use the results from Model 4 to calculate the predicted level of development in an autocracy with property rights in the 10th percentile vs. the 90th, with all other covariates held at their mean. Do the same for democratic countries.
+
+$$  log(gdp\_pc) = \beta_{0} + \beta_{1}.prop\_vdem + \beta_{2}.dem\_polity + \beta_{3}.prop\_vdem \times dem\_polity + \beta_{4}.educ + \beta_{5}.elec\_access + e$$
+
+```{r}
+lm6 <- lm(gdp_pc.ln ~ prop_vdem + dem_polity + prop_vdem:dem_polity + educ + elec_access, data_omit)
+summ(lm6)
+```
+
+
+```{r}
+# Predicted level of development in an autocracy with property rights in 10th percentiles
+predicted_10_autocracies <- 5.19 + coef(lm6)[2] * 0.1 + 0 + coef(lm6)[4]*(mean(data_omit$educ)) + coef(lm6)[5]*(mean(data_omit$elec_access)) + 0
+predicted_10_autocracies
+```
+
+```{r}
+# Predicted level of development in an autocracy with property rights in 90th percentiles
+predicted_90_autocracies <- 5.19 + coef(lm6)[2] * 0.9 + 0 + coef(lm6)[4]*(mean(data_omit$educ)) + coef(lm6)[5]*(mean(data_omit$elec_access)) + 0
+predicted_90_autocracies
+```
+
+```{r}
+# Predicted level of development in a democracy with property rights in 10th percentiles
+predicted_10_democracies <- 5.19 + coef(lm6)[2] * 0.1 + coef(lm6)[3]*1 + coef(lm6)[4]*(mean(data_omit$educ)) + coef(lm6)[5]*(mean(data_omit$elec_access)) + coef(lm6)[6]*(mean(data_omit$prop_vdem))
+predicted_10_democracies 
+```
+
+
+```{r}
+# Predicted level of development in a democracy with property rights in 10th percentiles
+predicted_90_democracies <- 5.19 + coef(lm6)[2] * 0.9 + coef(lm6)[3]*1 + coef(lm6)[4]*(mean(data_omit$educ)) + coef(lm6)[5]*(mean(data_omit$elec_access)) + coef(lm6)[6]*(mean(data_omit$prop_vdem))
+predicted_90_democracies 
+```
+
