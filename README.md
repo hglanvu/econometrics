@@ -1,2 +1,2 @@
 # econometrics
-This is the R code from the assignments of my econometrics class 
+My assignments from POLSCI 630 - Econometrics
