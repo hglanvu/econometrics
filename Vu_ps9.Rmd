@@ -1,0 +1,98 @@
+---
+title: "POLSCI 630 - Problem Set 9"
+author: "Huong Vu"
+date: "3/5/2022"
+output: pdf_document
+---
+
+```{r, echo=T, results="hide", message=F, warning=F}
+
+library(tidyverse)
+library(jtools)
+library(margins)
+library(interflex)
+
+```
+
+# Continuous-continuous interaction
+
+## 1. Regress given on income, age, and their interactions. Report the regression table using summ()
+
+```{r, include=FALSE}
+dat = read_csv("contribupdate.csv")
+# summary(dat) #check NAs
+```
+
+$$
+given = \beta_0 + \beta_1. faminc_i + \beta_2.age_i + \beta_3 faminc_i \times age_i+ u
+$$
+
+```{r}
+lm1 <- lm(given ~ faminc + age + faminc:age, dat)
+summ(lm1)
+```
+
+## 2. What are the marginal effects of household income on campaign contributions for individuals who are 30, 50, and 70 years old?
+
+Margincal effect of household income on campaign contributions:
+$$
+\frac{\partial \hat{given}}{\partial faminc} = \hat{\beta}_1 + \hat{\beta}_3 \times age
+$$
+
+* The marginal effect of household income on campaign contributions for an individual who is 30 = -0.76 + 0.05 * 30 = 0.74. A one thousand dollar increase on family income of a 30 years old person is associated with  $ 0.74 increase in campaign contributions.
+
+* The marginal effect of household income on campaign contributions for an individual who is 50 = -0.76 + 0.05 * 50 = 1.74. A one thousand dollar increase on family income of a 50 years old person is associated with  $ 1.74 increase in campaign contributions.
+
+* The marginal effect of household income on campaign contributions for an individual who is 70 = -0.76 + 0.05 * 70 = 2.74. A one thousand dollar increase on family income of a 70 years old person is associated with  $ 2.74 increase in campaign contributions.
+
+```{r}
+# use margins function to check the answers
+margins(lm1, at = list(age = 30)) 
+margins(lm1, at = list(age = 50))
+margins(lm1, at = list(age = 70))
+```
+
+## 3. Create a marginal effect plot that gives that marginal effects of income on given at various age
+
+```{r}
+## Marginal effect of family income on campaign contribution for various ages
+cplot(lm1, x = "age", dx = "faminc", what = "effect")
+```
+
+
+# Binning estimator
+
+## 4. By using interflex, obtain estimates of marginal effect of household income on campaign contributions from the binning estimator with the number of bins = 3. Report the marginal effect estimates for all three bins and create a plot that contains the estimates from the binning estimator
+
+```{r}
+# convert dat to dataframe because interflex command only takes dataframe as input
+dat <- as.data.frame(dat)
+```
+
+```{r}
+binning <- interflex(Y = "given", D = "faminc", X = "age", 
+data = dat, estimator = "binning", nbins = 3)
+```
+
+```{r}
+# Marginal effects of family income on campaign contributions for each bin of age
+binning$est.bin
+# Plot
+binning$figure
+```
+
+
+## 5. Interpret the marginal effects of household income on campaign contributions for all three bins
+
+* The marginal effects of household income on campaign contributions for all three bins are significant because CIs of all bins do not include 0.
+
+* For the young people (L), a one thousand US dollar increase in the family income associates with a $1.011637 increase in campaign contributions.
+
+* For the middle-age people (M), a one thousand US dollar increase in the family income associates with a $2.095995 increase in campaign contributions.
+
+* For the old people (H), a one thousand US dollar increase in the family income associates with a $3.002115 increase in campaign contributions.
+
+
+## 6. Assess whether the linear interaction effect assumption holds
+
+In the regression model with the interaction term of family income and age, we held the linear interaction effect of the marginal effect of family income on campaign contributions constant. It means that for one year increase in age, the effect of family income on campaign contribution increases by $\hat{\beta_3}$  = 0.05 at all values of age. However, with binning estimator we are informed that each bin has a different coefficient. It means that for the people at different ranges of ages, there are the differences in the effect of family income on campaign contributions.
