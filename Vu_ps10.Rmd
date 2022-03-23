@@ -1,0 +1,189 @@
+---
+title: "POLSCI 630 - Problem Set 10"
+author: "Huong Vu"
+date: "3/18/2022"
+output: pdf_document
+---
+
+
+# I. Sample Size and Estimates of Beta
+## 1. 
+
+```{r, echo=T, results="hide", message=F, warning=F}
+# Load packages
+library(dplyr)
+library(tidyverse)
+library(haven)
+library(stargazer)
+library(jtools)
+
+```
+
+I loaded the data and checks NAs
+
+```{r, include=FALSE}
+dat = read_csv("voters.csv") # Load data
+#summary(dat) #check NAs
+```
+
+I transformed the variable income to the raw amount with a new variable named raw_income & log (raw_income + 1)
+```{r}
+dat <- dat %>%
+mutate(
+  raw_income = income*1000,  # transform the variable income to the raw amount
+  log_income = log(raw_income + 1)) # log raw_income + 1
+```
+
+I plotted the logged income against the original income variable
+
+```{r}
+plot(dat$raw_income, dat$log_income, xlab = "raw income", ylab = "log income")
+#plot(dat$income, dat$log_income)
+```
+
+* What kind of measurement error do we introduce by adding 1 to the raw income before transforming? By adding 1 to the raw income, we created a systematic - constant error. All values of income are biased by the same amount.
+
+## 2. Estimate the effect of logged income on support for taxes, controlling for age and gender. Interpret the coefficient on logged income. 
+
+The regression model:
+
+$$
+moretax = \beta_0 + \beta_1. log\_income + \beta_2.age + \beta_3.male + u
+$$
+
+```{r}
+lm1 <- lm(moretax ~ log_income + age + male, dat)
+summ(lm1)
+```
+
+* Interpret the coefficient on logged income: 1 percent increase in income results in a decrease of 10.49/100 = 0.1 degree in voters' preference in balancing town's budgets. It means that people with high incomes tend to support cutting spending rather than increasing taxes.
+
+
+## 3. Now, estimate the effect of logged income on support for taxes, controlling for age and gender, only on the first 150 observations in the dataset.  
+
+```{r}
+# Sample 150 observations from the population and estimate B_1
+
+#sample <- dat[sample(1:150), ] # how to fix the first 150 rows?
+
+sample <- dat %>% slice(1:150)
+lm2 <- lm(moretax ~ log_income + age + male, sample)
+summ(lm2)
+```
+
+
+* What happens to the standard errors when the sample size decreases dramatically? When the sample size decreases, the standard errors increase significantly. As the sample size gets smaller,the sample distribution becomes more dispersed. The mean of the distribution is further to the population mean.
+
+* Is the substantive effect of income on support for taxation the same when you take a subset of the data? With the smaller size of sample, the effect of income on support for taxation is different. 1 percent increase in income only results in  a decrease of 5.59/100 = 0.055 degree in preference of balancing town's budgets (lower support for cutting spending when compared with the bigger sample size).  
+
+
+## 4. Exploring the distribution of $\beta_1$ with different sample sizes
+
+Write a loop taking 100 random samples of 300 observations from the whole dataset; estimate the effect of logged income on support for taxes, controlling for age and gender on each sample. 
+
+```{r}
+# create an empty matrix to store outcomes
+fit1 <- matrix(ncol = 5, nrow = 100)
+all1 <- matrix(ncol = 5, nrow = 0)
+
+for (i in 1:100){
+  sample1 <- dat[sample(1:38326, 300), ]
+  #sample1 <- sample(dat, 300, replace = TRUE)
+  fit1[i,1:4] <- lm(moretax ~ log_income + age + male, data = sample1)$coefficients
+  fit1[i,5] <- 300 # the last col is the sample size
+}
+
+all1 <- rbind(all1, fit1)
+
+# First prepare the data 
+all1 <- as.data.frame(all1) # convert from matrix to data frame
+names(all1) <- c("B0", "B1", "B2", "B3", "n")
+```
+
+The histogram of the 100 $\beta_1$ coefficients from 100 random samples of 300 observations from the whole dataset
+
+```{r}
+hist(all1$B1,
+xlab = "B1 coefficients",
+ylab = "Count",
+main = "Histogram of B1 coefficients of 300 observations")
+abline(v = mean(all1$B1), # add a vertical line at the 20th quantile
+col = "blue")
+legend("topleft", # where to put the legend
+lty = c(1, 1), # specify line type: 1=solid line
+legend = c("mean"), # what do the lines stand for
+col = c("blue"))
+
+```
+
+Write a loop taking 100 random samples of 1500 observations from the whole dataset
+
+```{r}
+# create an empty matrix to store outcomes
+fit2 <- matrix(ncol = 5, nrow = 100)
+all2 <- matrix(ncol = 5, nrow = 0)
+
+for (i in 1:100){
+  sample2 <- dat[sample(1:38326, 1500), ]
+  #sample1 <- sample(dat, 300, replace = TRUE)
+  fit2[i,1:4] <- lm(moretax ~ log_income + age + male, data = sample2)$coefficients
+  fit2[i,5] <- 1500 # the last col is the sample size
+}
+
+all2 <- rbind(all2, fit2)
+
+# First prepare the data 
+all2 <- as.data.frame(all2) # convert from matrix to data frame
+names(all2) <- c("B0", "B1", "B2", "B3", "n")
+```
+
+The histogram of the 100 $\beta_1$ coefficients from 100 random samples of 1500 observations from the whole dataset
+
+```{r}
+hist(all2$B1,
+xlab = "B1 coefficients",
+ylab = "Count",
+main = "Histogram of B1 coefficients of 1500 observations")
+abline(v = mean(all2$B1), # add a vertical line at the mean
+col = "blue")
+legend("topleft", # where to put the legend
+lty = c(1, 1), # specify line type: 1=solid line
+legend = c("mean"), # what do the lines stand for
+col = c("blue"))
+```
+
+
+* Compare the mean and variance of the two histograms: the variance of coefficients for the samples of 300 observations is bigger than the variance of the samples of 1500 observations (from -12 to -9). With the smaller variances, the mean of the coefficients of 1500 observations is smaller than the mean of the 300 observations.
+
+* If we had only received 300 observations from the dataset of voters, might we have reached a different conclusion about the relationship between income and support for taxation than we reach having the full dataset? Is it possible that with a sample of only 300 observations, we could have reached the exact same conclusion as with the full dataset? The smaller dataset doesn't lead to the different conclusion about the relationship between income and support for taxation. The people with higher incomes still tend to support cutting spending. But with the smaller sample of observation, we could not have reach the exact same conclusion as with the full dataset. With the smaller sample, the coefficient is smaller. People with high income showed the less support for cutting spending as compared with the full dataset.
+
+
+# II. Measurement Error
+
+## 5. 
+
+$$
+moretax = \beta_0 + \beta_1. log\_income + \beta_2.age + \beta_3.male + u
+$$
+
+* Do you think this model suffers from measurement error in the dependent or independent variables? This model may suffer from measurement error from bthe independent variables.
+
+* State the type of errors the model may suffer from and explain how (or whether) this error bias our results: Stochastic - Independent: some people may misreport their income or age.
+
+## 6. 
+
+The regression model: 
+$$
+moretax = \beta_0 + \beta_1. log\_income + \beta_2.PID + \beta_3.log\_income * PID + \beta_4.male + \beta_5.age +  u
+$$
+
+```{r}
+lm3 <- lm(moretax ~ log_income + pid + age + male + log_income:pid, dat)
+summ(lm3)
+```
+
+* Does it appear that the effect of income on support for taxes is conditional on party identification? Why or why not? No, the effect of income on support for taxes is not conditional on party identification because the coefficient of interaction term is not statically significant. 
+
+* Make a case for what type of measurement error the variable might suffer from, and how this error may bias the results: Introducing `pid` to the model could cause stochastic measurement error in independent variable. `pid` with the scale of 7 points from "lean" to "strong" makes it difficult for respondents to choose one scale that fits them. Especially, it's difficult to choose between "lean" and "not very strong". 
+
+
