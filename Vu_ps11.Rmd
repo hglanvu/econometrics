@@ -1,0 +1,203 @@
+---
+title: "PUPOLSCI 630 - Problem Set 11"
+author: "Huong Vu"
+date: "3/29/2022"
+output: pdf_document
+---
+
+```{r, echo=T, results="hide", message=F, warning=F}
+# Libraries
+
+library(tidyverse)
+library(haven)
+library(jtools)
+library(margins)
+library(memisc)
+library(skedastic)
+library(ggplot2)
+#install.packages("ggfortify")
+library(ggfortify)
+
+# install.packages("remotes")
+library(remotes)
+install_github("vqv/ggbiplot")
+library(ggbiplot)
+
+library(AER)
+library(miceadds)
+```
+
+# 1.Princiapl Component Analysis (PCA)
+
+```{r, include=FALSE}
+dat = read_csv("pca.csv") # Load data
+summary(dat) #check NAs
+dat <- dat %>% remove_rownames %>% column_to_rownames(var = "country_code") # moving the first column to row names
+df <- na.omit(dat)
+summary(df)
+var(df)
+```
+
+## 1.1. Perform principal component analysis with the four variables: dem_polity, fh_pr, dem_vdem, and elec_access. Report the principal component loadings for all variables.
+
+```{r cars}
+PCA <- prcomp(df, scale = TRUE) # performing PCA
+PCA$rotation # Get the principal component loadings
+```
+
+## 1.2. Based on the principal component loadings, what do you think the first principal component is measuring? What do you think the second principal component is measuring? 
+
+From the first principal component, we see the similar weight on `dem_polity`, `dem_vdem` and `fh_pr` and less weight on `elec_access`. So the first component may be the measurement of democracy. And the second component may be the measurement of electricity access.
+
+## 1.3. Report the proportion of variance explained by each principal component. You can calculate it by hand or use a built-in function.
+
+```{r}
+summary(PCA) # calculate the proportion of variance explained by each principal component using a built-in function
+```
+
+## 1.4. Report the principal component scores for all observations (excluding observations with NA(s) in one or more of the variables).
+
+```{r}
+PCA$x
+```
+
+## 1.5. Provide a plot of first principal component vs. second principal component.
+
+```{r}
+#autoplot(PCA)
+autoplot(PCA, data = df, colour = 'elec_access')
+```
+
+```{r}
+ggbiplot(PCA, labels = rownames(df))
+```
+
+
+# 2. Heteroskedasticity
+
+```{r pressure, echo=FALSE}
+schools = read_csv("schools.csv") # Load data
+summary(schools)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## 2.1. Regress `story4` on `lunch`, `enroll`, `exppp`, and the interaction between `lunch` and `exppp`. What is the impact of expenditures per pupil on students passing 4th grade reading test when `lunch` = 0 and 30?
+
+The regression model:
+$$
+story4 = \beta_0 + \beta_1. lunch + \beta_2.enroll + \beta_3.exppp +  \beta_4. lunch\times exppp + u
+$$
+
+```{r}
+lm <- lm(story4 ~ lunch + enroll + exppp + lunch:exppp, schools)
+summ(lm)
+```
+
+## 2.2. Perform regression diagnostics using plot(). Does the model seem to suffer from heteroskedasticity?
+Looking at the plot, I think that this model seems to suffer from heteroskedasticity
+
+```{r}
+plot(lm)
+```
+
+## 2.3. Formally test for heteroskedasticity with White test by hand. Interpret your test statistics.
+
+```{r}
+y <- schools$story4
+x1 <- schools$lunch
+x2 <- schools$enroll
+x3 <- schools$exppp
+
+```
+
+Test for heteroskedasticity with White test by hand:
+
+```{r}
+# Step 1
+m_w <- lm(y ~ x1 + x2 + x3 + x1:x3)
+squared_residuals <- resid(m_w) ^ 2
+predicted <- predict(m_w)
+squared_predicted <- predict(m_w) ^ 2
+
+# Step 2
+m_w_stage2 <- lm(squared_residuals ~ predicted + squared_predicted)
+R_squared_w <- summary(m_w_stage2)$r.squared
+n <- length(y) # N observations
+
+# Step 3
+(lm_st_w <- n*(R_squared_w))
+(1 - pchisq(lm_st_w, df = 2))
+```
+
+## 2.4. Formally test for heteroskedasticity with the Breusch-Pagan test and the White test using R’s built-in functions. Interpret your test statistics.
+
+```{r}
+bptest(lm)
+```
+
+* The test statistic is X^2 = 131.88
+* The degrees of freedom is 4
+* The corresponding p-value is 2.2e-16
+* Ho: Homoscedasticity is present
+* H1: heteroskedasticity is present
+* We can reject the null because p-value is very small --> This model suffers from heteroskedasticity
+
+```{r}
+y_hat_schools <- predict(m_w)
+bptest(m_w, varformula = ~ y_hat_schools + I(y_hat_schools^2))
+```
+
+* The test statistic is X^2 = 157.28
+* The degrees of freedom is 2
+* The corresponding p-value is 2.2e-16
+* Ho: Homoscedasticity is present
+* H1: heteroskedasticity is present
+* We can reject the null because p-value is very small --> This model suffers from heteroskedasticity
+
+
+## 2.5. Suppose you suspect that heteroskedasticity is present and decide to use robust standard errors to be safe. Calculate robust standard errors for your model by hand. Verify with a built-in function.
+
+\[
+\hat{Var} (\hat \beta_j) = \frac{\sum_{i=1}^{n} \hat r^2_{ij}\hat u_i^2}{SSR_j^2}
+\]
+
+```{r}
+m_robust1 <- lm(x1 ~ x2 + x3 + x1:x3)
+m_robust2 <- lm(x2 ~ x1 + x3 + x1:x3)
+m_robust3 <- lm(x3 ~ x1 + x2 + x1:x3)
+m_robust4 <- lm(I(x1*x3) ~ x1 + x2 + x3)
+```
+
+```{r}
+numerator1 <- sum((resid(m_robust1)**2) * (resid(lm)**2))
+SSR1 <- sum(resid(m_robust1)**2) ** 2
+(var_beta_1 <- numerator1 / SSR1) # variance
+```
+
+```{r}
+(robust_se_beta_1 <- sqrt(var_beta_1)) # robust std. error
+```
+
+```{r}
+numerator2 <- sum((resid(m_robust2)**2) * (resid(lm)**2))
+SSR2 <- sum(resid(m_robust2)**2) ** 2
+(var_beta_2 <- numerator2 / SSR2)
+```
+
+```{r}
+(robust_se_beta_2 <- sqrt(var_beta_2)) # robust std. error
+```
+
+Verify by built-in function
+
+```{r}
+var <- vcovHC(lm, type = "HC") # from the sandwich package (through AER)
+var
+```
+
+```{r}
+robust_se <- sqrt(diag(var))
+robust_se
+```
+
