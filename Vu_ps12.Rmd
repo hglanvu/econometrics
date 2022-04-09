@@ -1,0 +1,259 @@
+---
+title: "PUPOLSCI 630 - Problem Set 12"
+author: "Huong Vu"
+date: "4/3/2022"
+output: pdf_document
+---
+
+```{r, echo=T, results="hide", message=F, warning=F}
+# Libraries
+library(tidyverse)
+library(jtools)
+library(stargazer)
+library(caret) 
+
+# Load dataset
+dat <- read_csv("smoking_PS12.csv") # load data
+summary(dat) # check NAs
+
+```
+
+# 1.Outlier Detection
+## 1.1 Regress `cigs` on `income` and plot the regression line in the same plot with the data points.
+
+The regression model:
+$$
+cigs = \beta_0 + \beta_1. income + u
+$$
+
+```{r}
+lm1 <- lm(cigs ~ income, dat)
+summ(lm1)
+```
+
+Plot the regression line in the same plot with the data points:
+
+```{r}
+plot(
+dat$income, dat$cigs,
+col="white",
+main = "Income vs. smoking habits",
+xlab = "Annual Income",
+ylab = "Cigarettes smoked per day")
+abline(lm1, col = "red") # Add regression line
+text(dat$income, dat$cigs, labels = dat$id, cex= 0.7)
+```
+
+Plot the residuals vs. the fitted values:
+
+```{r}
+par(mfrow = c(1,2)) # print two plots at once, 1 row, 2 cols
+
+# plot by hand
+plot(lm1$fitted.values, lm1$residuals,
+col = "white",
+main = "Residuals vs. Fitted Values",
+xlab = "Fitted Values (yhat)",
+ylab = "Residuals (y - yhat)")
+abline(h = 0, col = "red",lty = 2)
+text(lm1$fitted.values, lm1$residuals, labels = dat$id, cex= 0.7)
+
+# plot using command
+plot(lm1, which = 1)  
+
+```
+
+* Which observations seem to warrant investigation? The observations 432, 336 and 406 may need more investigation.
+
+* Provide an explanation for why we might want to look at the jackknifed residuals in addition to the normal residuals: for the outlier analysis, the normal residual may not be the most useful numbers. Because the outliers tend to pull the regression line closer to them. With the studentenized residuals, which is the residuals estimated without outliers, we know the true standard error.
+
+## 1.2. Calculate the leverage scores for each observation in model 1 (cigs ~ income)
+
+```{r}
+# calculate leverage by hand
+X = model.matrix(lm1)
+hat_matrix <- X%*%(solve(t(X)%*%X)%*%t(X))
+leverage <- diag(hat_matrix)
+dat$leverage <- leverage
+
+# Visualize leverage
+ggplot(data = dat, aes(x = income, y = cigs)) +
+geom_point(aes(col = leverage)) +
+#geom_text(aes(label = dat$id), size = 3, vjust = -1)+
+geom_text(aes(label = ifelse(leverage > 0.01, as.character(id), '')), size = 3, vjust = -1)+
+geom_vline(xintercept = mean(dat$income)) +
+ggtitle("Income vs. Smoking habits") +
+ylab("Cigarettes per day") + xlab("Income")
+```
+
+* Which three observations have the highest leverage scores? They are 13, 314 and 485.
+
+* Are these the same observations you identified in question 1 above? Why might the high leverage observations be different from outliers in general? They are not the same observations identified in question 1.1. Because outliers are the observations which are very different from the predicted value while leverage observations are x values which are significantly high or low. Observation 13, 314 and 485 have very high income compared with other observations.
+
+## 1.3 Calculate the Cook’s distance to determine which observations are most influential
+
+```{r}
+par(mfrow = c(1,2))
+
+cooks <- cooks.distance(lm1)
+dat$cooks <- cooks
+
+# Plot by Hand
+plot(dat$income, dat$cooks,
+type = "n", # another way to say "don’t plot the points"
+main = "Cook’s distance by X",
+xlab = "Income",
+ylab = "Cook’s D")
+abline(h = 4/nrow(dat), lty = 2, col = "red") 
+text(dat$income, dat$cooks, labels = dat$id, cex= 0.7)
+
+# Canned plot
+plot(lm1, which = 4)
+```
+
+* Conclude which three observations are most influential in the model: 432, 416 and 322. Are these the same as the high leverage observations? No, they are the different observations.
+
+* Why do you think the most influential cases are/are not the same as the highest leverage cases in this dataset? Because to identify whether the data point is influential or not, it also depends on the observed value of y.
+
+## 1.4. Check the robustness of your model by running a model that drops the three most influential observation.
+
+```{r, results = "asis"}
+# recall the base model:
+# lm1 <- lm(cigs ~ income, dat)
+
+# Drop influential observations which are 432, 336 and 406
+lm2 <- lm(cigs ~ income, dat %>% filter(id != "432" & id != "336" & id != "406"))
+
+# Collect robust standard errors in list for table
+models = list(lm1, lm2)
+rses = lapply(models, function(x) sqrt(diag(vcov(x, type = "HC1"))))
+
+# Print table
+stargazer(models,
+se = rses, # replace SEs with robust SEs calculated above
+title = "Robustness Checks Dropping Influential Observations",
+dep.var.labels = c("Original model", "Dropped model"),
+covariate.labels = c("Income"),
+omit.stat = c("ser", "f"), # remove summary stats from printed table
+font.size = "footnotesize", # make the text small
+# Add note to the bottom about which models drop obs
+add.lines = list(c("Influential Obs Dropped", "No", "Yes")),
+notes.align = "l", # makes the note at bottom left-justified
+notes = c("Robust standard errors reported in parentheses."),
+type = "latex", header = F)
+
+```
+
+
+* Interpret the coefficient on income: it's not statistically significant.
+
+* Are your original results robust to dropping outliers? Explain. No, because the standard errors of 2 models are the same (0.00005).
+
+# 2. Model Fit
+
+## 2.1 Run three models:
+
+$$
+cigs = \beta_0 + \beta_1. income + u
+$$
+$$
+cigs = \beta_0 + \beta_1. income + \beta_2.cigpric + \beta_3.age +\beta_4.age^{2} + \beta_5.educ + u
+$$
+$$
+cigs = \beta_0 + \beta_1. log(income) + \beta_2.cigpric + \beta_3.age +\beta_4.age^{2} + \beta_5.educ + \beta_6. white + \beta_7.married + u
+$$
+```{r}
+dat$age2 <- dat$age^2 # create a new column of age^2
+
+lm1 <- lm(cigs ~ income, dat)
+summ(lm1)
+lm3 <- lm(cigs ~ income + cigpric + age +age2 + educ, dat)
+summ(lm3)
+lm4 <- lm(cigs ~ log(income) + cigpric + age +age2 + educ + white + married, dat)
+summ(lm4)
+
+
+```
+
+## 2.2 Compute the R-squared, Standard Error of the Regression, and Root Mean Squared Error of each of the three models by hand
+
+```{r}
+
+summary(lm1)$r.squared
+summary(lm3)$r.squared
+summary(lm4)$r.squared
+
+SER = function(x){
+ssr = sum(residuals(x)^2)
+n = length(x$fitted.values)
+sqrt(ssr/n)
+}
+
+RMSE = function(x){
+ssr = sum(residuals(x)^2)
+denom = length(x$fitted.values) - length(x$coefficients) - 1
+sqrt(ssr/denom)
+}
+
+# combine all models into list
+models = list(lm1, lm3, lm4)
+# Standard Error of Regression
+ser = lapply(models, function(x) round(SER(x),3))
+# Root Mean Squared Error
+rmse = lapply(models, function(x) round(RMSE(x),3))
+
+stargazer(models,
+se = rses,
+omit.stat = "ser",
+add.lines = list(c("SER", ser[[1]], ser[[2]], ser[[3]]),
+c("RMSE", rmse[[1]], rmse[[2]], rmse[[3]])),
+title = "Comparing Model Fit",
+dep.var.labels = "Number of cigarettes smoked per day",
+notes.align = "l", # makes the note at bottom left-justified
+notes = c("Robust standard errors reported in parentheses."),
+type = "text", header = F)
+```
+
+* Looking at these measures of model fit, which model would you say fits the data the best? Justify your response. Model 2 (lm3) fits the data the best because RMSE of model 2 is the smallest among three models.
+
+## 2.3 Calculate the Mean Squared Error for each model using k-fold cross validation, where k = 4.
+
+```{r}
+set.seed(330) # to get the same randomization every time
+cv = trainControl(method = "cv",
+                  number = 4)
+cv.lm1 = train(cigs ~ income,
+              data = dat,
+              method = "lm",
+              trControl = cv)
+
+cv.lm3 = train(cigs ~ income + cigpric + age +age2 + educ,
+               data = dat,
+               method = "lm",
+               trControl = cv)
+
+cv.lm4 = train (cigs ~ log(income) + cigpric + age +age2 + educ + white + married,
+                data = dat,
+                method = "lm",
+                trControl = cv)
+
+print(cv.lm1)
+print(cv.lm3)
+print(cv.lm4)
+
+
+cv_res = data.frame(Model = seq(0:2),
+                    RMSE = c(cv.lm1$results$RMSE,
+                             cv.lm3$results$RMSE,
+                             cv.lm4$results$RMSE))
+
+
+# Report results in a table
+stargazer(cv_res, type = "latex", header = F, summary = F, rownames = F,
+          title = "Comparison of 3 Models")
+
+```
+
+
+* If you were trying to predict how many cigarettes a person smokes a day, which model would you chose to make the prediction? I would choose model 2 - lm3. Because its RMSE is the smallest among three models (14.83536).
+  
